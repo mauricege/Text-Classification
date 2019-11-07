@@ -4,12 +4,12 @@ import warnings
 import shutil
 import json
 import models.attn_bi_lstm
+import models.adversarial_abblstm
+import models.attn_lstm_hierarchical
 import time
 import pickle
 import tensorflow as tf
 import pandas as pd
-from tensorflow.python.ops.rnn import bidirectional_dynamic_rnn as bi_rnn
-from tensorflow.compat.v1.nn.rnn_cell import BasicLSTMCell
 from utils.prepare_data import *
 from models.base_model import BaseModel
 from models.base_train import BaseTrain
@@ -68,6 +68,18 @@ def cli(verbose):
 def attentionBiLSTM(ctx):
     ctx.obj['model'] = models.attn_bi_lstm.AttentionBiLSTM
     ctx.obj['config'] = models.attn_bi_lstm.DEFAULT_CONFIG
+
+@click.group()
+@click.pass_context
+def adversarialClassifier(ctx):
+    ctx.obj['model'] = models.adversarial_abblstm.AdversarialClassifier
+    ctx.obj['config'] = models.adversarial_abblstm.DEFAULT_CONFIG
+
+@click.group()
+@click.pass_context
+def attentionLSTMHierarchical(ctx):
+    ctx.obj['model'] = models.attn_lstm_hierarchical.AttentionLSTMHierarchical
+    ctx.obj['config'] = models.attn_lstm_hierarchical.DEFAULT_CONFIG
 
 
 @click.command(
@@ -159,6 +171,9 @@ def train(ctx,
     CONFIG["checkpoint_dir"] = join(model_dir, "ckpts/")
     CONFIG["max_to_keep"] = max_to_keep
     CONFIG["max_len"] = max_len
+    CONFIG["vocab_freq"] = tokenizer.word_docs
+    CONFIG["word2idx"] = tokenizer.word_index
+
 
 
     # save config and tokenizer
@@ -290,5 +305,15 @@ if __name__ == '__main__':
     attentionBiLSTM.add_command(predict)
     attentionBiLSTM.add_command(eval)
     cli.add_command(attentionBiLSTM)
+
+    adversarialClassifier.add_command(train)
+    adversarialClassifier.add_command(predict)
+    adversarialClassifier.add_command(eval)
+    cli.add_command(adversarialClassifier)
+
+    attentionLSTMHierarchical.add_command(train)
+    attentionLSTMHierarchical.add_command(predict)
+    attentionLSTMHierarchical.add_command(eval)
+    cli.add_command(attentionLSTMHierarchical)
 
     cli(obj={})

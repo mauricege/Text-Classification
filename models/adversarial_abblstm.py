@@ -1,12 +1,19 @@
 from tensorflow.compat.v1.nn.rnn_cell import BasicLSTMCell
 from tensorflow.python.ops.rnn import bidirectional_dynamic_rnn as bi_rnn
 import time
+from .base_model import BaseModel
 from utils.prepare_data import *
 from utils.model_helper import *
 import tensorflow as tf
 
 tf.compat.v1.disable_eager_execution()
 
+DEFAULT_CONFIG = {
+        "max_len": 32,
+        "hidden_size": 64,
+        "embedding_size": 128,
+        "epsilon": 5,
+    }
 
 def scale_l2(x, norm_length):
     # shape(x) = (batch, num_timesteps, d)
@@ -28,21 +35,22 @@ def normalize(emb, weights):
     stddev = tf.sqrt(1e-6 + var)
     return (emb - mean) / stddev
 
-
-class AdversarialClassifier(object):
+class AdversarialClassifier(BaseModel):
     def __init__(self, config):
-        self.max_len = config["max_len"]
-        self.hidden_size = config["hidden_size"]
-        self.vocab_size = config["vocab_size"]
-        self.embedding_size = config["embedding_size"]
-        self.n_class = config["n_class"]
-        self.learning_rate = config["learning_rate"]
-        self.epsilon = config["epsilon"]
+        super(AdversarialClassifier, self).__init__(config)
 
-        # placeholder
-        self.x = tf.compat.v1.placeholder(tf.int32, [None, self.max_len])
-        self.label = tf.compat.v1.placeholder(tf.int32, [None])
-        self.keep_prob = tf.compat.v1.placeholder(tf.float32)
+        self.max_len = config.max_len
+        self.hidden_size = config.hidden_size
+        self.vocab_size = config.vocab_size
+        self.embedding_size = config.embedding_size
+        self.n_class = config.n_class
+        self.learning_rate = config.learning_rate
+        self.epsilon = config.epsilon
+        self.vocab_freq = config.vocab_freq
+        self.word2idx = config.word2idx
+
+        self.build_model()
+        self.init_saver()
 
     def _add_perturbation(self, embedded, loss):
         """Adds gradient to embedding and recomputes classification loss."""
@@ -64,8 +72,12 @@ class AdversarialClassifier(object):
             freq[word_idx] = word_freq
         return freq
 
-    def build_graph(self, vocab_freq, word2idx):
-        vocab_freqs = tf.constant(self._get_freq(vocab_freq, word2idx),
+    def build_model(self):
+        # placeholder
+        self.x = tf.compat.v1.placeholder(tf.int32, [None, self.max_len])
+        self.y = tf.compat.v1.placeholder(tf.int32, [None, self.n_class])
+        self.keep_prob = tf.compat.v1.placeholder(tf.float32)
+        vocab_freqs = tf.constant(self._get_freq(self.vocab_freq, self.word2idx),
                                   dtype=tf.float32, shape=(self.vocab_size, 1))
         weights = vocab_freqs / tf.reduce_sum(input_tensor=vocab_freqs)
         embeddings_var = tf.Variable(tf.compat.v1.random_uniform([self.vocab_size, self.embedding_size], -1.0, 1.0),
@@ -91,14 +103,14 @@ class AdversarialClassifier(object):
                                                 tf.reshape(W, [-1, 1])))
                 r = tf.matmul(tf.transpose(a=H, perm=[0, 2, 1]), tf.reshape(alpha, [-1, self.max_len,
                                                                              1]))  # supposed to be (batch_size * HIDDEN_SIZE, 1)
-                r = tf.squeeze(r)
+                r = tf.squeeze(r, [2])
                 h_star = tf.tanh(r)
-                drop = tf.nn.dropout(h_star, 1 - (1 - (keep_prob)))
+                drop = tf.nn.dropout(h_star, 1 - keep_prob)
 
                 # Fully connected layer（dense layer)
                 y_hat = tf.compat.v1.nn.xw_plus_b(drop, W_fc, b_fc)
 
-            return y_hat, tf.reduce_mean(input_tensor=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y_hat, labels=self.label))
+            return y_hat, tf.reduce_mean(input_tensor=tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(logits=y_hat, labels=self.y))
 
         self.logits, self.cls_loss = cal_loss_logit(batch_embedded, self.keep_prob, reuse=False)
         embedding_perturbated = self._add_perturbation(batch_embedded, self.cls_loss)
@@ -111,74 +123,13 @@ class AdversarialClassifier(object):
         gradients = tf.gradients(ys=loss_to_minimize, xs=tvars, aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE)
         grads, global_norm = tf.clip_by_global_norm(gradients, 1.0)
 
-        self.global_step = tf.Variable(0, name="global_step", trainable=False)
         self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
-        self.train_op = self.optimizer.apply_gradients(zip(grads, tvars), global_step=self.global_step,
+        self.train_op = self.optimizer.apply_gradients(zip(grads, tvars), global_step=self.global_step_tensor,
                                                        name='train_step')
-        self.prediction = tf.argmax(input=tf.nn.softmax(self.logits), axis=1)
+        self.probabilities = tf.nn.softmax(self.logits)
+        self.prediction = tf.argmax(input=self.probabilities, axis=1)
+        self.accuracy = tf.reduce_mean(input_tensor=tf.cast(tf.equal(self.prediction, tf.argmax(input=self.y, axis=1)), tf.float32))
 
-        print("graph built successfully!")
 
-
-if __name__ == '__main__':
-    # load data
-    x_train, y_train = load_data("twitter.training.csv", sample_ratio=1, one_hot=False, n_class=2)
-    x_test, y_test = load_data("twitter.test.csv", one_hot=False, n_class=2)
-
-    # data preprocessing
-    x_train, x_test, vocab_freq, word2idx, vocab_size = \
-        data_preprocessing_with_dict(x_train, x_test, max_len=32)
-    print("train size: ", len(x_train))
-    print("vocab size: ", vocab_size)
-
-    # split dataset to test and dev
-    x_test, x_dev, y_test, y_dev, dev_size, test_size = \
-        split_dataset(x_test, y_test, 0.1)
-    print("Validation Size: ", dev_size)
-
-    config = {
-        "max_len": 32,
-        "hidden_size": 64,
-        "vocab_size": vocab_size,
-        "embedding_size": 128,
-        "n_class": 2,
-        "learning_rate": 1e-3,
-        "batch_size": 32,
-        "train_epoch": 10,
-        "epsilon": 5,
-    }
-
-    classifier = AdversarialClassifier(config)
-    classifier.build_graph(vocab_freq, word2idx)
-    
-    # auto GPU growth, avoid occupy all GPU memory
-    tf_config = tf.compat.v1.ConfigProto()
-    tf_config.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=tf_config)
-
-    sess.run(tf.compat.v1.global_variables_initializer())
-    dev_batch = (x_dev, y_dev)
-    start = time.time()
-    for e in range(config["train_epoch"]):
-
-        t0 = time.time()
-        print("Epoch %d start !" % (e + 1))
-        for x_batch, y_batch in fill_feed_dict(x_train, y_train, config["batch_size"]):
-            return_dict = run_train_step(classifier, sess, (x_batch, y_batch))
-        t1 = time.time()
-
-        print("Train Epoch time:  %.3f s" % (t1 - t0))
-        return_dict = run_eval_step(classifier, sess, dev_batch)
-        dev_acc = np.sum(np.equal(return_dict['prediction'], y_dev)) / len(return_dict['prediction'])
-        print("validation accuracy: %.3f " % dev_acc)
-
-    print("Training finished, time consumed : ", time.time() - start, " s")
-    print("Start evaluating:  \n")
-    cnt = 0
-    test_acc = 0
-    for x_batch, y_batch in fill_feed_dict(x_test, y_test, config["batch_size"]):
-        acc = run_eval_step(classifier, sess, (x_batch, y_batch))
-        test_acc += acc
-        cnt += 1
-
-    print("Test accuracy : %f %%" % (test_acc / cnt * 100))
+    def init_saver(self):
+        self.saver = tf.compat.v1.train.Saver(max_to_keep=self.config.max_to_keep)
