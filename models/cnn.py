@@ -25,11 +25,11 @@ def linear(input_, output_size, scope=None):
     input_size = shape[1]
 
     # Now the computation.
-    with tf.variable_scope(scope or "SimpleLinear"):
-        matrix = tf.get_variable("Matrix", [output_size, input_size], dtype=input_.dtype)
-        bias_term = tf.get_variable("Bias", [output_size], dtype=input_.dtype)
+    with tf.compat.v1.variable_scope(scope or "SimpleLinear"):
+        matrix = tf.compat.v1.get_variable("Matrix", [output_size, input_size], dtype=input_.dtype)
+        bias_term = tf.compat.v1.get_variable("Bias", [output_size], dtype=input_.dtype)
 
-    return tf.matmul(input_, tf.transpose(matrix)) + bias_term
+    return tf.matmul(input_, tf.transpose(a=matrix)) + bias_term
 
 
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
@@ -39,7 +39,7 @@ def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'
     where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
     """
 
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         for idx in range(num_layers):
             g = f(linear(input_, size, scope='highway_lin_%d' % idx))
 
@@ -65,39 +65,39 @@ class CNNClassfier(object):
         self.learning_rate = config["learning_rate"]
 
         # placeholder
-        self.x = tf.placeholder(tf.int32, [None, self.max_len], name="input_x")
-        self.label = tf.placeholder(tf.int32, [None], name="input_y")
-        self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+        self.x = tf.compat.v1.placeholder(tf.int32, [None, self.max_len], name="input_x")
+        self.label = tf.compat.v1.placeholder(tf.int32, [None], name="input_y")
+        self.keep_prob = tf.compat.v1.placeholder(tf.float32, name="keep_prob")
 
     def build_graph(self):
         print("building graph")
         l2_loss = tf.constant(0.0)
-        with tf.variable_scope("discriminator"):
+        with tf.compat.v1.variable_scope("discriminator"):
             # Embedding:
-            with tf.device('/cpu:0'), tf.name_scope("embedding"):
+            with tf.device('/cpu:0'), tf.compat.v1.name_scope("embedding"):
                 self.W = tf.Variable(
-                    tf.random_uniform([self.vocab_size, self.embedding_size], -1.0, 1.0),
+                    tf.random.uniform([self.vocab_size, self.embedding_size], -1.0, 1.0),
                     name="W")
-                self.embedded_chars = tf.nn.embedding_lookup(self.W, self.x)  # batch_size * seq * embedding_size
+                self.embedded_chars = tf.nn.embedding_lookup(params=self.W, ids=self.x)  # batch_size * seq * embedding_size
                 self.embedded_chars_expanded = tf.expand_dims(self.embedded_chars, -1) # expand dims for conv operation
             pooled_outputs = list()
             # Create a convolution + max-pool layer for each filter size
             for filter_size, filter_num in zip(self.filter_sizes, self.num_filters):
-                with tf.name_scope("cov2d-maxpool%s" % filter_size):
+                with tf.compat.v1.name_scope("cov2d-maxpool%s" % filter_size):
                     filter_shape = [filter_size, self.embedding_size, 1, filter_num]
-                    W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
+                    W = tf.Variable(tf.random.truncated_normal(filter_shape, stddev=0.1), name="W")
                     b = tf.Variable(tf.constant(0.1, shape=[filter_num]), name="b")
                     conv = tf.nn.conv2d(
-                        self.embedded_chars_expanded,
-                        W,
+                        input=self.embedded_chars_expanded,
+                        filters=W,
                         strides=[1, 1, 1, 1],
                         padding="VALID",
                         name="conv")
                     # print(conv.name, ": ", conv.shape) batch * (seq - filter_shape) + 1 * 1(output channel) *
                     # filter_num
                     h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
-                    pooled = tf.nn.max_pool(
-                        h,
+                    pooled = tf.nn.max_pool2d(
+                        input=h,
                         ksize=[1, self.max_len - filter_size + 1, 1, 1],
                         strides=[1, 1, 1, 1],
                         padding='VALID',
@@ -110,31 +110,31 @@ class CNNClassfier(object):
             self.h_pool_flat = tf.reshape(self.h_pool, [-1, total_filters_num])  # batch * total_num
 
             # highway network
-            with tf.name_scope("highway"):
+            with tf.compat.v1.name_scope("highway"):
                 self.h_highway = highway(self.h_pool_flat, self.h_pool_flat.get_shape()[1], 1, 0)
 
             # add droppout
-            with tf.name_scope("dropout"):
-                self.h_drop = tf.nn.dropout(self.h_highway, self.keep_prob)
+            with tf.compat.v1.name_scope("dropout"):
+                self.h_drop = tf.nn.dropout(self.h_highway, 1 - (1 - (self.keep_prob)))
 
-            with tf.name_scope("output"):
-                W = tf.Variable(tf.truncated_normal([total_filters_num, self.num_classes], stddev=0.1), name="W")
+            with tf.compat.v1.name_scope("output"):
+                W = tf.Variable(tf.random.truncated_normal([total_filters_num, self.num_classes], stddev=0.1), name="W")
                 b = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name="b")
                 l2_loss += tf.nn.l2_loss(W)
                 l2_loss += tf.nn.l2_loss(b)
-                self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores")
+                self.scores = tf.compat.v1.nn.xw_plus_b(self.h_drop, W, b, name="scores")
                 self.ypred_for_auc = tf.nn.softmax(self.scores)
-                self.prediction = tf.cast(tf.argmax(self.ypred_for_auc, 1), dtype=tf.int32)
+                self.prediction = tf.cast(tf.argmax(input=self.ypred_for_auc, axis=1), dtype=tf.int32)
 
-            with tf.name_scope("loss"):
+            with tf.compat.v1.name_scope("loss"):
                 losses = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.scores, labels=self.label)
                 self.loss = losses + self.l2_reg_lambda * l2_loss
-            with tf.name_scope("accuracy"):
+            with tf.compat.v1.name_scope("accuracy"):
                 self.accuracy = tf.reduce_mean(
-                    tf.cast(tf.equal(self.prediction, self.label), tf.float32))
+                    input_tensor=tf.cast(tf.equal(self.prediction, self.label), tf.float32))
 
-        self.params = [param for param in tf.trainable_variables() if 'discriminator' in param.name]
-        d_optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        self.params = [param for param in tf.compat.v1.trainable_variables() if 'discriminator' in param.name]
+        d_optimizer = tf.compat.v1.train.AdamOptimizer(self.learning_rate)
         # aggregation_method =2 能够帮助减少内存占用
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
         grads_and_vars = d_optimizer.compute_gradients(self.loss, self.params, aggregation_method=2)
@@ -177,11 +177,11 @@ if __name__ == '__main__':
     classifier.build_graph()
 
     # auto GPU growth, avoid occupy all GPU memory
-    tf_config = tf.ConfigProto()
+    tf_config = tf.compat.v1.ConfigProto()
     tf_config.gpu_options.allow_growth = True
-    sess = tf.Session(config=tf_config)
+    sess = tf.compat.v1.Session(config=tf_config)
 
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.compat.v1.global_variables_initializer())
     dev_batch = (x_dev, y_dev)
     start = time.time()
     for e in range(config["train_epoch"]):

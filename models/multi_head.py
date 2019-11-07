@@ -14,34 +14,34 @@ class AttentionClassifier(object):
         self.learning_rate = config["learning_rate"]
 
         # placeholder
-        self.x = tf.placeholder(tf.int32, [None, self.max_len])
-        self.label = tf.placeholder(tf.int32, [None])
-        self.keep_prob = tf.placeholder(tf.float32)
+        self.x = tf.compat.v1.placeholder(tf.int32, [None, self.max_len])
+        self.label = tf.compat.v1.placeholder(tf.int32, [None])
+        self.keep_prob = tf.compat.v1.placeholder(tf.float32)
 
     def build_graph(self):
         print("building graph...")
-        embeddings_var = tf.Variable(tf.random_uniform([self.vocab_size, self.embedding_size], -1.0, 1.0),
+        embeddings_var = tf.Variable(tf.random.uniform([self.vocab_size, self.embedding_size], -1.0, 1.0),
                                      trainable=True)
-        batch_embedded = tf.nn.embedding_lookup(embeddings_var, self.x)
+        batch_embedded = tf.nn.embedding_lookup(params=embeddings_var, ids=self.x)
         # multi-head attention
         ma = multihead_attention(queries=batch_embedded, keys=batch_embedded)
         # FFN(x) = LN(x + point-wisely NN(x))
         outputs = feedforward(ma, [self.hidden_size, self.embedding_size])
         outputs = tf.reshape(outputs, [-1, self.max_len * self.embedding_size])
-        logits = tf.layers.dense(outputs, units=self.n_class)
+        logits = tf.compat.v1.layers.dense(outputs, units=self.n_class)
 
         self.loss = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=self.label))
-        self.prediction = tf.argmax(tf.nn.softmax(logits), 1)
+            input_tensor=tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=self.label))
+        self.prediction = tf.argmax(input=tf.nn.softmax(logits), axis=1)
 
         # optimization
         loss_to_minimize = self.loss
-        tvars = tf.trainable_variables()
-        gradients = tf.gradients(loss_to_minimize, tvars, aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE)
+        tvars = tf.compat.v1.trainable_variables()
+        gradients = tf.gradients(ys=loss_to_minimize, xs=tvars, aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE)
         grads, global_norm = tf.clip_by_global_norm(gradients, 1.0)
 
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate)
         self.train_op = self.optimizer.apply_gradients(zip(grads, tvars), global_step=self.global_step,
                                                        name='train_step')
         print("graph built successfully!")
@@ -77,8 +77,8 @@ if __name__ == '__main__':
     classifier = AttentionClassifier(config)
     classifier.build_graph()
 
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
+    sess = tf.compat.v1.Session()
+    sess.run(tf.compat.v1.global_variables_initializer())
     dev_batch = (x_dev, y_dev)
     start = time.time()
     for e in range(config["train_epoch"]):

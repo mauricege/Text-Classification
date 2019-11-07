@@ -32,37 +32,37 @@ print("Validation size: ", dev_size)
 graph = tf.Graph()
 with graph.as_default():
 
-    batch_x = tf.placeholder(tf.int32, [None, MAX_DOCUMENT_LENGTH])
-    batch_y = tf.placeholder(tf.float32, [None, MAX_LABEL])
-    keep_prob = tf.placeholder(tf.float32)
+    batch_x = tf.compat.v1.placeholder(tf.int32, [None, MAX_DOCUMENT_LENGTH])
+    batch_y = tf.compat.v1.placeholder(tf.float32, [None, MAX_LABEL])
+    keep_prob = tf.compat.v1.placeholder(tf.float32)
 
-    embeddings_var = tf.Variable(tf.random_uniform([vocab_size, EMBEDDING_SIZE], -1.0, 1.0), trainable=True)
-    batch_embedded = tf.nn.embedding_lookup(embeddings_var, batch_x)
+    embeddings_var = tf.Variable(tf.random.uniform([vocab_size, EMBEDDING_SIZE], -1.0, 1.0), trainable=True)
+    batch_embedded = tf.nn.embedding_lookup(params=embeddings_var, ids=batch_x)
     print(batch_embedded.shape)  # (?, 256, 100)
 
     cell = IndRNNCell(HIDDEN_SIZE)
-    rnn_outputs, _ = tf.nn.dynamic_rnn(cell, batch_embedded, dtype=tf.float32)
+    rnn_outputs, _ = tf.compat.v1.nn.dynamic_rnn(cell, batch_embedded, dtype=tf.float32)
 
     # Attention
     attention_output, alphas = attention(rnn_outputs, ATTENTION_SIZE, return_alphas=True)
-    drop = tf.nn.dropout(attention_output, keep_prob)
+    drop = tf.nn.dropout(attention_output, 1 - (1 - (keep_prob)))
     shape = drop.get_shape()
 
     # Fully connected layer（dense layer)
-    W = tf.Variable(tf.truncated_normal([shape[1].value, MAX_LABEL], stddev=0.1))
+    W = tf.Variable(tf.random.truncated_normal([shape[1].value, MAX_LABEL], stddev=0.1))
     b = tf.Variable(tf.constant(0., shape=[MAX_LABEL]))
-    y_hat = tf.nn.xw_plus_b(drop, W, b)
+    y_hat = tf.compat.v1.nn.xw_plus_b(drop, W, b)
 
-    loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_hat, labels=batch_y))
-    optimizer = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
+    loss = tf.reduce_mean(input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(logits=y_hat, labels=batch_y))
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(loss)
 
     # Accuracy metric
-    prediction = tf.argmax(tf.nn.softmax(y_hat), 1)
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(prediction, tf.argmax(batch_y, 1)), tf.float32))
+    prediction = tf.argmax(input=tf.nn.softmax(y_hat), axis=1)
+    accuracy = tf.reduce_mean(input_tensor=tf.cast(tf.equal(prediction, tf.argmax(input=batch_y, axis=1)), tf.float32))
 
 
-with tf.Session(graph=graph) as sess:
-    sess.run(tf.global_variables_initializer())
+with tf.compat.v1.Session(graph=graph) as sess:
+    sess.run(tf.compat.v1.global_variables_initializer())
     print("Initialized! ")
 
     print("Start trainning")

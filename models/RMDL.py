@@ -38,7 +38,7 @@ def load_data(file_name, sample_ratio=1, n_class=15, one_hot=True):
 
 
 if __name__ == "__main__":
-    dbpedia = tf.contrib.learn.datasets.load_dataset('dbpedia')
+    #dbpedia = tf.contrib.learn.datasets.load_dataset('dbpedia')
 
 
     X_train, y_train = load_data("dbpedia_data/dbpedia_csv/train.csv", sample_ratio=1e-2, one_hot=False)
