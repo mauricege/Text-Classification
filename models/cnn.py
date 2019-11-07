@@ -4,7 +4,6 @@ from .base_model import BaseModel
 from utils.model_helper import *
 
 DEFAULT_CONFIG = {
-        "max_len": 120,
         "embedding_size": 32,
         "l2_reg_lambda": 1e-3,
         # random setting, may need fine-tune

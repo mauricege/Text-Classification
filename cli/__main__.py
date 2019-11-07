@@ -126,6 +126,11 @@ def multiheadAttention(ctx):
               type=int,
               default=32,
               help='Batch size for training.')
+@click.option('-es',
+              '--embedding-size',
+              type=int,
+              default=128,
+              help='Embedding size for the word vectors.')
 @click.option('-e',
               '--epochs',
               type=int,
@@ -153,6 +158,7 @@ def train(ctx,
           validation_data,
           yes,
           batch_size=32,
+          embedding_size=128,
           epochs=20,
           learning_rate=1e-3,
           max_to_keep=5,
@@ -185,6 +191,7 @@ def train(ctx,
     CONFIG["vocab_size"] = vocab_size
     CONFIG["n_class"] = y_train.shape[1]
     CONFIG["batch_size"] = batch_size
+    CONFIG["embedding_size"] = embedding_size
     CONFIG["learning_rate"] = learning_rate
     CONFIG["num_epochs"] = epochs
     CONFIG["summary_dir"] = join(model_dir, "log")

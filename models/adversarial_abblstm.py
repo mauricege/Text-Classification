@@ -9,7 +9,6 @@ import tensorflow as tf
 tf.compat.v1.disable_eager_execution()
 
 DEFAULT_CONFIG = {
-        "max_len": 32,
         "hidden_size": 64,
         "embedding_size": 128,
         "epsilon": 5,

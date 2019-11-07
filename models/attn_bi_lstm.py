@@ -18,16 +18,8 @@ import pandas as pd
 tf.compat.v1.disable_eager_execution()
 
 DEFAULT_CONFIG = {
-        "max_len": 32,
         "hidden_size": 64,
         "embedding_size": 128,
-        "n_class": 10,
-        "learning_rate": 1e-3,
-        "batch_size": 64,
-        "num_epochs": 20,
-        "summary_dir": "log",
-        "checkpoint_dir": "ckpts/",
-        "max_to_keep": 5
     }
 
 class AttentionBiLSTM(BaseModel):

@@ -11,7 +11,6 @@ tf.compat.v1.disable_eager_execution()
 
 
 DEFAULT_CONFIG = {'embedding_size': 128,
-                'max_len': 256,
                 'hidden_size': 64,
                 'attention_size': 64,
                 'lmbda': 0.0001}

@@ -6,7 +6,6 @@ from .base_model import BaseModel
 import tensorflow as tf
 
 DEFAULT_CONFIG = {
-        "max_len": 32,
         "hidden_size": 64,
         "embedding_size": 128,
     }
