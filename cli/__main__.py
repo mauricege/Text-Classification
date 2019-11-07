@@ -6,6 +6,7 @@ import json
 import models.attn_bi_lstm
 import models.adversarial_abblstm
 import models.attn_lstm_hierarchical
+import models.cnn
 import time
 import pickle
 import tensorflow as tf
@@ -81,6 +82,11 @@ def attentionLSTMHierarchical(ctx):
     ctx.obj['model'] = models.attn_lstm_hierarchical.AttentionLSTMHierarchical
     ctx.obj['config'] = models.attn_lstm_hierarchical.DEFAULT_CONFIG
 
+@click.group()
+@click.pass_context
+def cnn(ctx):
+    ctx.obj['model'] = models.cnn.CNN
+    ctx.obj['config'] = models.cnn.DEFAULT_CONFIG
 
 @click.command(
     help=
@@ -149,14 +155,14 @@ def train(ctx,
     # load data
     _, x_train, y_train = load_data(training_data, sample_ratio=0.01)
     x_train, vocab_size, tokenizer = \
-        data_preprocessing(x_train, max_len=32, tokenizer=None)
+        data_preprocessing(x_train, max_len=max_len, tokenizer=None)
     print("train size: ", len(x_train))
     print("vocab size: ", vocab_size)
 
     if validation_data is not None:
         _, x_dev, y_dev = load_data(validation_data, shuffle=False)
         x_dev, vocab_size, tokenizer = \
-        data_preprocessing(x_dev, max_len=32, tokenizer=tokenizer)
+        data_preprocessing(x_dev, max_len=max_len, tokenizer=tokenizer)
     else:
         x_train, x_dev, y_train, y_dev, dev_size, _ = \
             split_dataset(x_train, y_train, 0.1)
@@ -315,5 +321,10 @@ if __name__ == '__main__':
     attentionLSTMHierarchical.add_command(predict)
     attentionLSTMHierarchical.add_command(eval)
     cli.add_command(attentionLSTMHierarchical)
+
+    cnn.add_command(train)
+    cnn.add_command(predict)
+    cnn.add_command(eval)
+    cli.add_command(cnn)
 
     cli(obj={})
