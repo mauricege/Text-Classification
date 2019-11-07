@@ -41,7 +41,7 @@ class IndRNNCell(LayerRNNCell):  # 继承 LayerRNNCell
 
     def build(self, inputs_shape):
         '''construct the IndRNN Cell'''
-        if inputs_shape[1].value is None:
+        if inputs_shape[1] is None:
             raise ValueError("Expected input shape[1] is known")
 
         input_depth = inputs_shape[1]

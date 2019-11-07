@@ -7,6 +7,7 @@ import models.attn_bi_lstm
 import models.adversarial_abblstm
 import models.attn_lstm_hierarchical
 import models.cnn
+import models.ind_rnn_tc
 import time
 import pickle
 import tensorflow as tf
@@ -72,13 +73,13 @@ def attentionBiLSTM(ctx):
 
 @click.group()
 @click.pass_context
-def adversarialClassifier(ctx):
+def adversarial(ctx):
     ctx.obj['model'] = models.adversarial_abblstm.AdversarialClassifier
     ctx.obj['config'] = models.adversarial_abblstm.DEFAULT_CONFIG
 
 @click.group()
 @click.pass_context
-def attentionLSTMHierarchical(ctx):
+def hierarchicalAttention(ctx):
     ctx.obj['model'] = models.attn_lstm_hierarchical.AttentionLSTMHierarchical
     ctx.obj['config'] = models.attn_lstm_hierarchical.DEFAULT_CONFIG
 
@@ -87,6 +88,12 @@ def attentionLSTMHierarchical(ctx):
 def cnn(ctx):
     ctx.obj['model'] = models.cnn.CNN
     ctx.obj['config'] = models.cnn.DEFAULT_CONFIG
+
+@click.group()
+@click.pass_context
+def indRNN(ctx):
+    ctx.obj['model'] = models.ind_rnn_tc.IndRNN
+    ctx.obj['config'] = models.ind_rnn_tc.DEFAULT_CONFIG
 
 @click.command(
     help=
@@ -153,7 +160,7 @@ def train(ctx,
     MODEL = ctx.obj['model']
     CONFIG = ctx.obj['config']
     # load data
-    _, x_train, y_train = load_data(training_data, sample_ratio=0.01)
+    _, x_train, y_train = load_data(training_data, sample_ratio=1)
     x_train, vocab_size, tokenizer = \
         data_preprocessing(x_train, max_len=max_len, tokenizer=None)
     print("train size: ", len(x_train))
@@ -312,19 +319,24 @@ if __name__ == '__main__':
     attentionBiLSTM.add_command(eval)
     cli.add_command(attentionBiLSTM)
 
-    adversarialClassifier.add_command(train)
-    adversarialClassifier.add_command(predict)
-    adversarialClassifier.add_command(eval)
-    cli.add_command(adversarialClassifier)
+    adversarial.add_command(train)
+    adversarial.add_command(predict)
+    adversarial.add_command(eval)
+    cli.add_command(adversarial)
 
-    attentionLSTMHierarchical.add_command(train)
-    attentionLSTMHierarchical.add_command(predict)
-    attentionLSTMHierarchical.add_command(eval)
-    cli.add_command(attentionLSTMHierarchical)
+    hierarchicalAttention.add_command(train)
+    hierarchicalAttention.add_command(predict)
+    hierarchicalAttention.add_command(eval)
+    cli.add_command(hierarchicalAttention)
 
     cnn.add_command(train)
     cnn.add_command(predict)
     cnn.add_command(eval)
     cli.add_command(cnn)
+
+    indRNN.add_command(train)
+    indRNN.add_command(predict)
+    indRNN.add_command(eval)
+    cli.add_command(indRNN)
 
     cli(obj={})

@@ -7,6 +7,8 @@ This repository is forked from https://github.com/TobiasLee/Text-Classification.
 * scikit-learn
 * click
 * pandas
+* bunch
+* tqdm
 
 ## Very Short Rundown
 The models work with csv files containing the columns "title", "content" and "class". Training a model works like this:
