@@ -1,5 +1,5 @@
 # Text Classification Models
-This repository is forked from https://github.com/TobiasLee/Text-Classification. It adds a commandline interface for convenient model training, evaluation and prediction and updates the code to be compatible with tensorflow 2.
+This repository is forked from https://github.com/TobiasLee/Text-Classification. It adds a commandline interface for convenient model training, evaluation and prediction and updates the code to be compatible with tensorflow 2. The base_model.py and base_train.py modules have been adapted from https://github.com/MrGemy95/Tensorflow-Project-Template
 
 ## Dependencies
 * python >= 3.7

@@ -8,6 +8,7 @@ import models.adversarial_abblstm
 import models.attn_lstm_hierarchical
 import models.cnn
 import models.ind_rnn_tc
+import models.multi_head
 import time
 import pickle
 import tensorflow as tf
@@ -94,6 +95,12 @@ def cnn(ctx):
 def indRNN(ctx):
     ctx.obj['model'] = models.ind_rnn_tc.IndRNN
     ctx.obj['config'] = models.ind_rnn_tc.DEFAULT_CONFIG
+
+@click.group()
+@click.pass_context
+def multiheadAttention(ctx):
+    ctx.obj['model'] = models.multi_head.MultiheadAttention
+    ctx.obj['config'] = models.multi_head.DEFAULT_CONFIG
 
 @click.command(
     help=
@@ -338,5 +345,10 @@ if __name__ == '__main__':
     indRNN.add_command(predict)
     indRNN.add_command(eval)
     cli.add_command(indRNN)
+
+    multiheadAttention.add_command(train)
+    multiheadAttention.add_command(predict)
+    multiheadAttention.add_command(eval)
+    cli.add_command(multiheadAttention)
 
     cli(obj={})
